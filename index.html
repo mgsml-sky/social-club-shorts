@@ -18,7 +18,7 @@
             margin: 0;
         }
         .glass-overlay {
-            background: rgba(5, 11, 20, 0.9);
+            background: rgba(5, 11, 20, 0.95);
             backdrop-filter: blur(12px);
         }
         ::-webkit-scrollbar { width: 0px; height: 0px; }
@@ -27,10 +27,10 @@
             overflow-y: scroll;
             scroll-snap-type: y mandatory;
             scroll-behavior: smooth;
-            padding-top: 110px;
+            padding-top: 155px; /* Space for Facebook-style tall header */
         }
         .short-item {
-            height: calc(100vh - 110px);
+            height: calc(100vh - 155px);
             scroll-snap-align: start;
             position: relative;
             display: flex;
@@ -39,16 +39,27 @@
             background: #000;
             width: 100%;
         }
-        .story-ring {
-            background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
-            padding: 2px;
-            border-radius: 9999px;
+        /* Facebook Style Story Card */
+        .fb-story-card {
+            min-width: 95px;
+            height: 145px;
+            border-radius: 14px;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+            flex-shrink: 0;
+            border: 2px solid rgba(234, 179, 8, 0.3);
+            background: #111;
+            transition: transform 0.2s ease;
+        }
+        .fb-story-card:active {
+            transform: scale(0.95);
         }
     </style>
 </head>
 <body>
 
-    <!-- Top Header & Story-Style Horizontal Reel Highlights -->
+    <!-- Top Header & Facebook-Style Tall Horizontal Highlights -->
     <header class="fixed top-0 left-0 right-0 z-40 px-3 py-2.5 glass-overlay border-b border-yellow-500/20 space-y-2">
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-2.5">
@@ -59,20 +70,17 @@
                     <span class="text-xs font-black tracking-wider bg-gradient-to-r from-yellow-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">
                         SOCIAL CLUB SHORTS
                     </span>
-                    <span class="text-[8px] font-bold text-gray-300">Allowed: Up to 3 Mins Shorts Clips</span>
+                    <span class="text-[8px] font-bold text-gray-300">Facebook Style Reels Feed (Max 3M)</span>
                 </div>
             </div>
             <span class="text-[10px] font-black text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-0.5 rounded-full">
-                ⚡ Stable Feed
+                ⚡ FB Feed
             </span>
         </div>
 
-        <!-- TOP HORIZONTAL HIGHLIGHTS -->
-        <div id="topHighlightsBar" class="flex space-x-3 overflow-x-auto py-1 scroll-smooth items-center">
-            <div class="text-[9px] font-black text-yellow-400 uppercase tracking-widest whitespace-nowrap flex items-center space-x-1">
-                <i class="fa-solid fa-fire text-pink-500 text-xs"></i>
-                <span>Highlights</span>
-            </div>
+        <!-- FACEBOOK STYLE TALL HORIZONTAL HIGHLIGHTS BAR -->
+        <div id="topHighlightsBar" class="flex space-x-2.5 overflow-x-auto py-1 scroll-smooth items-center">
+            <!-- Dynamic FB Story Cards render here -->
         </div>
     </header>
 
@@ -80,7 +88,7 @@
     <div id="shortsFeedContainer" class="shorts-container">
         <div class="short-item flex flex-col items-center justify-center text-center p-6 text-gray-400">
             <i class="fa-solid fa-spinner fa-spin text-3xl text-yellow-400 mb-2"></i>
-            <p class="text-xs font-bold">Loading Shorts Reels...</p>
+            <p class="text-xs font-bold">Loading Facebook Style Reels...</p>
         </div>
     </div>
 
@@ -147,70 +155,60 @@
         function loadShortsAndHighlights() {
             let savedMovies = JSON.parse(localStorage.getItem('mgsml_stream_movies') || '[]');
             
-            // STRICT DURATION FILTER: 
-            // Allow 1 second up to 180 seconds (3 Minutes). Block anything above 180s (5m, 10m, 1hr movies).
+            // STRICT DURATION FILTER: Max 180 seconds (3 minutes). Long movies blocked.
             let shortItems = savedMovies.filter(m => {
                 let cat = (m.category || '').toLowerCase();
-                let dur = parseInt(m.duration || 0); // duration in seconds
-                
+                let dur = parseInt(m.duration || 0);
                 if(cat === 'movie' || cat === 'long') return false;
-                if(dur > 180) return false; // Block > 3 minutes (180 seconds)
-                
+                if(dur > 180) return false;
                 return cat === 'short' || m.isShort === true || (dur > 0 && dur <= 180);
             });
 
-            // Fallback for testing if no category matched
             if(shortItems.length === 0 && savedMovies.length > 0) {
                 shortItems = savedMovies.filter(m => parseInt(m.duration || 0) <= 180);
-                if(shortItems.length === 0) shortItems = savedMovies.slice(0, 3);
+                if(shortItems.length === 0) shortItems = savedMovies.slice(0, 4);
             }
 
             let highlightsBar = document.getElementById('topHighlightsBar');
             let feedContainer = document.getElementById('shortsFeedContainer');
 
             if (shortItems.length === 0) {
-                highlightsBar.innerHTML = `<span class="text-[9px] text-gray-400">No clips found</span>`;
+                highlightsBar.innerHTML = `<span class="text-[9px] text-gray-400 px-2">No short clips found</span>`;
                 feedContainer.innerHTML = `
                     <div class="short-item flex flex-col items-center justify-center text-center p-6 text-gray-400">
                         <i class="fa-solid fa-triangle-exclamation text-4xl text-yellow-400 mb-3"></i>
-                        <p class="text-sm font-bold">No Short Reels Available (Max 3 Mins)!</p>
+                        <p class="text-sm font-bold">No Short Reels Available!</p>
                         <p class="text-xs text-gray-500 mt-1">Long movies (&gt;3m) are blocked here.</p>
                     </div>`;
                 return;
             }
 
-            // Populate Top Highlights
+            // Populate Facebook Style Tall Horizontal Story Cards
             let sortedByViews = [...shortItems].sort((a, b) => (b.views || 0) - (a.views || 0));
-            highlightsBar.innerHTML = `
-                <div class="text-[9px] font-black text-yellow-400 uppercase tracking-widest whitespace-nowrap flex items-center space-x-1 pr-1">
-                    <i class="fa-solid fa-fire text-pink-500 text-xs"></i>
-                    <span>Highlights</span>
-                </div>`;
+            highlightsBar.innerHTML = '';
                 
             sortedByViews.forEach((item, index) => {
                 let thumb = item.thumbnail || '';
-                let thumbMarkup = thumb ? `<img src="${thumb}" class="w-full h-full object-cover rounded-full">` : `
-                    <div class="w-full h-full bg-slate-900 rounded-full flex flex-col items-center justify-center text-yellow-400 font-black text-[9px]">
+                let thumbMarkup = thumb ? `<img src="${thumb}" class="w-full h-full object-cover">` : `
+                    <div class="w-full h-full bg-slate-900 flex items-center justify-center text-yellow-400 font-bold text-xs">
                         <i class="fa-solid fa-play"></i>
                     </div>`;
                 
-                let highlightChip = `
-                    <div onclick="scrollToShort(${index})" class="flex flex-col items-center flex-shrink-0 cursor-pointer active:scale-95 transition">
-                        <div class="story-ring w-12 h-12 flex items-center justify-center">
-                            <div class="w-11 h-11 rounded-full overflow-hidden bg-black border-2 border-black">
-                                ${thumbMarkup}
-                            </div>
+                let fbCard = `
+                    <div onclick="scrollToShort(${index})" class="fb-story-card shadow-lg">
+                        ${thumbMarkup}
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-end p-2">
+                            <span class="text-[9px] font-black text-white truncate drop-shadow">${item.title}</span>
+                            <span class="text-[7px] text-yellow-400 font-bold">▶ Play Reel</span>
                         </div>
-                        <span class="text-[8px] font-bold text-gray-300 mt-1 truncate max-w-[50px]">${item.title}</span>
                     </div>
                 `;
-                highlightsBar.innerHTML += highlightChip;
+                highlightsBar.innerHTML += fbCard;
             });
 
-            // Populate Vertical Shorts Feed (Stable Embed to stop stuttering/restarting)
+            // Populate Vertical Shorts Feed
             feedContainer.innerHTML = "";
             shortItems.forEach((item, index) => {
-                // autoplay=false & muted=false ensures video loads fully and plays smoothly without looping bugs
                 let embedUrl = `https://iframe.mediadelivery.net/embed/${LIBRARY_ID}/${item.id}?autoplay=false&loop=false&muted=false`;
                 
                 let shortDiv = `
@@ -244,7 +242,7 @@
                         <!-- Bottom Info Overlay -->
                         <div class="absolute bottom-5 left-4 right-16 z-30 space-y-1 pointer-events-none">
                             <span class="px-2 py-0.5 rounded-full bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 text-[9px] font-black uppercase tracking-wider">
-                                ⚡ Short Reel (Up to 3m)
+                                ⚡ Short Reel (Max 3M)
                             </span>
                             <h2 class="text-xs font-black text-white drop-shadow-md line-clamp-1">${item.title}</h2>
                             <p class="text-[11px] text-gray-200 drop-shadow-md line-clamp-2">${item.description || 'MGSML Social Club Short.'}</p>
