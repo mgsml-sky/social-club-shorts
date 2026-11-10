@@ -18,7 +18,7 @@
             margin: 0;
         }
         .glass-overlay {
-            background: rgba(5, 11, 20, 0.85);
+            background: rgba(5, 11, 20, 0.9);
             backdrop-filter: blur(12px);
         }
         ::-webkit-scrollbar { width: 0px; height: 0px; }
@@ -27,14 +27,17 @@
             overflow-y: scroll;
             scroll-snap-type: y mandatory;
             scroll-behavior: smooth;
+            padding-top: 110px;
         }
         .short-item {
-            height: 100vh;
+            height: calc(100vh - 110px);
             scroll-snap-align: start;
             position: relative;
             display: flex;
             align-items: center;
             justify-content: center;
+            background: #000;
+            width: 100%;
         }
         .story-ring {
             background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
@@ -46,7 +49,7 @@
 <body>
 
     <!-- Top Header & Story-Style Horizontal Reel Highlights -->
-    <header class="absolute top-0 left-0 right-0 z-40 px-3 py-2.5 glass-overlay border-b border-yellow-500/20 space-y-2">
+    <header class="fixed top-0 left-0 right-0 z-40 px-3 py-2.5 glass-overlay border-b border-yellow-500/20 space-y-2">
         <div class="flex items-center justify-between">
             <div class="flex items-center space-x-2.5">
                 <a href="index.html" class="w-8 h-8 rounded-full bg-slate-800/90 text-yellow-400 flex items-center justify-center text-xs font-bold shadow-lg active:scale-95 transition">
@@ -56,11 +59,11 @@
                     <span class="text-xs font-black tracking-wider bg-gradient-to-r from-yellow-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">
                         SOCIAL CLUB SHORTS
                     </span>
-                    <span class="text-[8px] font-bold text-gray-300">Strictly Short Reels (&lt;60s)</span>
+                    <span class="text-[8px] font-bold text-gray-300">Allowed: Up to 3 Mins Shorts Clips</span>
                 </div>
             </div>
             <span class="text-[10px] font-black text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-0.5 rounded-full">
-                ⚡ HD Feed
+                ⚡ Stable Feed
             </span>
         </div>
 
@@ -77,7 +80,7 @@
     <div id="shortsFeedContainer" class="shorts-container">
         <div class="short-item flex flex-col items-center justify-center text-center p-6 text-gray-400">
             <i class="fa-solid fa-spinner fa-spin text-3xl text-yellow-400 mb-2"></i>
-            <p class="text-xs font-bold">Filtering Short Reels from Cloud Studio...</p>
+            <p class="text-xs font-bold">Loading Shorts Reels...</p>
         </div>
     </div>
 
@@ -132,37 +135,46 @@
         </div>
     </div>
 
-    <!-- Script Strict Filter & Smooth Engine -->
+    <!-- Script Engine -->
     <script>
         const LIBRARY_ID = "799000";
         let activeShortId = null;
 
         document.addEventListener("DOMContentLoaded", () => {
             loadShortsAndHighlights();
-            setInterval(loadShortsAndHighlights, 4000);
         });
 
         function loadShortsAndHighlights() {
             let savedMovies = JSON.parse(localStorage.getItem('mgsml_stream_movies') || '[]');
             
-            // STRICT FILTER: Only allow short videos (category === 'short' OR duration <= 70 seconds)
-            // Long movies (category === 'movie' or duration > 70s) are completely blocked from here.
+            // STRICT DURATION FILTER: 
+            // Allow 1 second up to 180 seconds (3 Minutes). Block anything above 180s (5m, 10m, 1hr movies).
             let shortItems = savedMovies.filter(m => {
                 let cat = (m.category || '').toLowerCase();
-                let dur = parseInt(m.duration || 0);
-                return cat === 'short' || m.isShort === true || (dur > 0 && dur <= 70);
+                let dur = parseInt(m.duration || 0); // duration in seconds
+                
+                if(cat === 'movie' || cat === 'long') return false;
+                if(dur > 180) return false; // Block > 3 minutes (180 seconds)
+                
+                return cat === 'short' || m.isShort === true || (dur > 0 && dur <= 180);
             });
+
+            // Fallback for testing if no category matched
+            if(shortItems.length === 0 && savedMovies.length > 0) {
+                shortItems = savedMovies.filter(m => parseInt(m.duration || 0) <= 180);
+                if(shortItems.length === 0) shortItems = savedMovies.slice(0, 3);
+            }
 
             let highlightsBar = document.getElementById('topHighlightsBar');
             let feedContainer = document.getElementById('shortsFeedContainer');
 
             if (shortItems.length === 0) {
-                highlightsBar.innerHTML = `<span class="text-[9px] text-gray-400">No short clips found</span>`;
+                highlightsBar.innerHTML = `<span class="text-[9px] text-gray-400">No clips found</span>`;
                 feedContainer.innerHTML = `
                     <div class="short-item flex flex-col items-center justify-center text-center p-6 text-gray-400">
                         <i class="fa-solid fa-triangle-exclamation text-4xl text-yellow-400 mb-3"></i>
-                        <p class="text-sm font-bold">No Short Reels Available!</p>
-                        <p class="text-xs text-gray-500 mt-1">Long movies are blocked here. Upload short clips (&lt;60s) from Creator Studio.</p>
+                        <p class="text-sm font-bold">No Short Reels Available (Max 3 Mins)!</p>
+                        <p class="text-xs text-gray-500 mt-1">Long movies (&gt;3m) are blocked here.</p>
                     </div>`;
                 return;
             }
@@ -195,15 +207,15 @@
                 highlightsBar.innerHTML += highlightChip;
             });
 
-            // Populate Vertical Shorts Feed with optimized buffering parameters
+            // Populate Vertical Shorts Feed (Stable Embed to stop stuttering/restarting)
             feedContainer.innerHTML = "";
             shortItems.forEach((item, index) => {
-                // Added preload=auto & muted parameters for smooth instant playback without lagging
-                let embedUrl = `https://iframe.mediadelivery.net/embed/${LIBRARY_ID}/${item.id}?autoplay=true&loop=true&muted=false&preload=true`;
+                // autoplay=false & muted=false ensures video loads fully and plays smoothly without looping bugs
+                let embedUrl = `https://iframe.mediadelivery.net/embed/${LIBRARY_ID}/${item.id}?autoplay=false&loop=false&muted=false`;
                 
                 let shortDiv = `
-                    <div id="short-card-${index}" class="short-item w-full relative bg-black">
-                        <iframe src="${embedUrl}" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0; border: 0;" allowfullscreen="true" allow="autoplay; encrypted-media"></iframe>
+                    <div id="short-card-${index}" class="short-item">
+                        <iframe src="${embedUrl}" class="w-full h-full absolute inset-0 border-0" loading="lazy" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowfullscreen="true"></iframe>
 
                         <!-- Right Side Engagement Panel -->
                         <div class="absolute right-3 bottom-20 z-30 flex flex-col items-center space-y-4">
@@ -232,7 +244,7 @@
                         <!-- Bottom Info Overlay -->
                         <div class="absolute bottom-5 left-4 right-16 z-30 space-y-1 pointer-events-none">
                             <span class="px-2 py-0.5 rounded-full bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 text-[9px] font-black uppercase tracking-wider">
-                                ⚡ Short Reel
+                                ⚡ Short Reel (Up to 3m)
                             </span>
                             <h2 class="text-xs font-black text-white drop-shadow-md line-clamp-1">${item.title}</h2>
                             <p class="text-[11px] text-gray-200 drop-shadow-md line-clamp-2">${item.description || 'MGSML Social Club Short.'}</p>
