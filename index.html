@@ -36,7 +36,6 @@
             align-items: center;
             justify-content: center;
         }
-        /* Gradient Ring for Top Story Highlights */
         .story-ring {
             background: linear-gradient(45deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%);
             padding: 2px;
@@ -57,30 +56,28 @@
                     <span class="text-xs font-black tracking-wider bg-gradient-to-r from-yellow-400 via-pink-400 to-cyan-400 bg-clip-text text-transparent">
                         SOCIAL CLUB SHORTS
                     </span>
-                    <span class="text-[8px] font-bold text-gray-300">Trending Clips & Vertical Reels</span>
+                    <span class="text-[8px] font-bold text-gray-300">Strictly Short Reels (&lt;60s)</span>
                 </div>
             </div>
             <span class="text-[10px] font-black text-yellow-400 bg-yellow-500/10 border border-yellow-500/30 px-2 py-0.5 rounded-full">
-                ⚡ Live Feed
+                ⚡ HD Feed
             </span>
         </div>
 
-        <!-- TOP HORIZONTAL HIGHLIGHTS (STORIES STYLE) -->
+        <!-- TOP HORIZONTAL HIGHLIGHTS -->
         <div id="topHighlightsBar" class="flex space-x-3 overflow-x-auto py-1 scroll-smooth items-center">
             <div class="text-[9px] font-black text-yellow-400 uppercase tracking-widest whitespace-nowrap flex items-center space-x-1">
                 <i class="fa-solid fa-fire text-pink-500 text-xs"></i>
                 <span>Highlights</span>
             </div>
-            <!-- Dynamic Round Highlight Reels render here -->
         </div>
     </header>
 
     <!-- Shorts Vertical Scroll Container -->
     <div id="shortsFeedContainer" class="shorts-container">
-        <!-- Dynamic Short Reels render here -->
         <div class="short-item flex flex-col items-center justify-center text-center p-6 text-gray-400">
             <i class="fa-solid fa-spinner fa-spin text-3xl text-yellow-400 mb-2"></i>
-            <p class="text-xs font-bold">Auto-fetching Shorts from Cloud Studio...</p>
+            <p class="text-xs font-bold">Filtering Short Reels from Cloud Studio...</p>
         </div>
     </div>
 
@@ -135,38 +132,42 @@
         </div>
     </div>
 
-    <!-- Script Auto-Sync Engine -->
+    <!-- Script Strict Filter & Smooth Engine -->
     <script>
         const LIBRARY_ID = "799000";
         let activeShortId = null;
 
         document.addEventListener("DOMContentLoaded", () => {
             loadShortsAndHighlights();
-            setInterval(loadShortsAndHighlights, 3000);
+            setInterval(loadShortsAndHighlights, 4000);
         });
 
         function loadShortsAndHighlights() {
             let savedMovies = JSON.parse(localStorage.getItem('mgsml_stream_movies') || '[]');
             
-            // Filter strictly for shorts or clips
-            let shortItems = savedMovies.filter(m => m.category === 'short' || m.isShort === true);
-            if (shortItems.length === 0) { shortItems = savedMovies; }
+            // STRICT FILTER: Only allow short videos (category === 'short' OR duration <= 70 seconds)
+            // Long movies (category === 'movie' or duration > 70s) are completely blocked from here.
+            let shortItems = savedMovies.filter(m => {
+                let cat = (m.category || '').toLowerCase();
+                let dur = parseInt(m.duration || 0);
+                return cat === 'short' || m.isShort === true || (dur > 0 && dur <= 70);
+            });
 
             let highlightsBar = document.getElementById('topHighlightsBar');
             let feedContainer = document.getElementById('shortsFeedContainer');
 
             if (shortItems.length === 0) {
-                highlightsBar.innerHTML = `<span class="text-[9px] text-gray-400">No highlights</span>`;
+                highlightsBar.innerHTML = `<span class="text-[9px] text-gray-400">No short clips found</span>`;
                 feedContainer.innerHTML = `
                     <div class="short-item flex flex-col items-center justify-center text-center p-6 text-gray-400">
-                        <i class="fa-solid fa-clapperboard text-4xl text-yellow-400 mb-3"></i>
-                        <p class="text-sm font-bold">No Shorts Available Yet!</p>
-                        <p class="text-xs text-gray-500 mt-1">Upload short clips from Creator Studio.</p>
+                        <i class="fa-solid fa-triangle-exclamation text-4xl text-yellow-400 mb-3"></i>
+                        <p class="text-sm font-bold">No Short Reels Available!</p>
+                        <p class="text-xs text-gray-500 mt-1">Long movies are blocked here. Upload short clips (&lt;60s) from Creator Studio.</p>
                     </div>`;
                 return;
             }
 
-            // Populate Top Horizontal Story Highlights (Sorted by views)
+            // Populate Top Highlights
             let sortedByViews = [...shortItems].sort((a, b) => (b.views || 0) - (a.views || 0));
             highlightsBar.innerHTML = `
                 <div class="text-[9px] font-black text-yellow-400 uppercase tracking-widest whitespace-nowrap flex items-center space-x-1 pr-1">
@@ -194,10 +195,11 @@
                 highlightsBar.innerHTML += highlightChip;
             });
 
-            // Populate Vertical Shorts Feed
+            // Populate Vertical Shorts Feed with optimized buffering parameters
             feedContainer.innerHTML = "";
             shortItems.forEach((item, index) => {
-                let embedUrl = `https://iframe.mediadelivery.net/embed/${LIBRARY_ID}/${item.id}?autoplay=true&loop=true&muted=false`;
+                // Added preload=auto & muted parameters for smooth instant playback without lagging
+                let embedUrl = `https://iframe.mediadelivery.net/embed/${LIBRARY_ID}/${item.id}?autoplay=true&loop=true&muted=false&preload=true`;
                 
                 let shortDiv = `
                     <div id="short-card-${index}" class="short-item w-full relative bg-black">
@@ -230,10 +232,10 @@
                         <!-- Bottom Info Overlay -->
                         <div class="absolute bottom-5 left-4 right-16 z-30 space-y-1 pointer-events-none">
                             <span class="px-2 py-0.5 rounded-full bg-yellow-500/20 border border-yellow-500/50 text-yellow-400 text-[9px] font-black uppercase tracking-wider">
-                                ⚡ Shorts Reel
+                                ⚡ Short Reel
                             </span>
                             <h2 class="text-xs font-black text-white drop-shadow-md line-clamp-1">${item.title}</h2>
-                            <p class="text-[11px] text-gray-200 drop-shadow-md line-clamp-2">${item.description || 'MGSML Social Club Vertical HD Short.'}</p>
+                            <p class="text-[11px] text-gray-200 drop-shadow-md line-clamp-2">${item.description || 'MGSML Social Club Short.'}</p>
                         </div>
                     </div>
                 `;
